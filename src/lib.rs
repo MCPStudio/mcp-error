@@ -61,6 +61,9 @@ pub enum Error {
     #[error("[UNKNOWN] {0}")]
     Unknown(ErrorContext),
 
+    #[error("[FILE SYSTEM] {0}")]
+    FileSystem(ErrorContext),
+
     #[error("[EXTERNAL] {0} | Source: {1}")]
     External(
         ErrorContext,
@@ -68,25 +71,43 @@ pub enum Error {
     ),
 }
 
+impl ErrorContext {
+    fn new(reference: &str, severity: Severity, description: impl Into<String>) -> Self {
+        Self {
+            reference: reference.to_string(),
+            severity,
+            description: description.into(),
+            metadata: HashMap::new(),
+        }
+    }
+}
+
 impl Error {
     /// Creates a new Network error.
     pub fn network(reference: &str, description: impl Into<String>) -> Self {
-        Self::Network(ErrorContext {
-            reference: format!("NET-{}", reference),
-            severity: Severity::Error,
-            description: description.into(),
-            metadata: HashMap::new(),
-        })
+        Self::Network(ErrorContext::new(
+            &format!("NET-{}", reference),
+            Severity::Error,
+            description,
+        ))
     }
 
     /// Creates a new Data Format error.
     pub fn data_format(reference: &str, description: impl Into<String>) -> Self {
-        Self::DataFormat(ErrorContext {
-            reference: format!("FMT-{}", reference),
-            severity: Severity::Error,
-            description: description.into(),
-            metadata: HashMap::new(),
-        })
+        Self::DataFormat(ErrorContext::new(
+            &format!("FMT-{}", reference),
+            Severity::Error,
+            description,
+        ))
+    }
+
+    /// Creates a File System error
+    pub fn file_system(reference: &str, description: impl Into<String>) -> Self {
+        Self::FileSystem(ErrorContext::new(
+            &format!("FSY-{}", reference),
+            Severity::Error,
+            description,
+        ))
     }
 
     /// Creates a new External error.
