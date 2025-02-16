@@ -10,7 +10,12 @@ Central error handling crate for Ephais ecosystem projects and libraries.
 `ephais-error` is a Rust crate designed to centralize error handling within the Ephais ecosystem. It standardizes how errors are created and displayed through a clear structure including:
 - Error severity classification
 - Error context containing a unique reference, readable description, and optional metadata field
-- Four error variants: `Network`, `DataFormat`, `Unknown` and `External`
+- Five error variants:
+    * `Network`
+    * `DataFormat`
+    * `FileSystem`
+    * `Unknown`
+    * `External`
 
 ---
 ---
@@ -19,7 +24,7 @@ Central error handling crate for Ephais ecosystem projects and libraries.
 
 - **Centralized error handling**: Through a common `ErrorContext`, each error contains detailed information (reference, severity, description, metadata)
 - **Severity levels**: Distinguish error importance (Critical, Error, Warning, Info)
-- **Specific error variants**: Each error type (network, format, unknown and external) is defined as a variant of the `Error` enum
+- **Specific error variants**: Each error type (network, format, filesystem, unknown and external) is defined as a variant of the `Error` enum
 - **Type alias**: A `Result<T>` alias is provided to simplify result handling in your functions
 
 ---
@@ -52,6 +57,7 @@ Each error contains an ErrorContext with the following fields:
 
 * Network: For network connection-related errors
 * DataFormat: For data formatting or parsing errors
+* FileSystem : For file system related error (files, folders, etc)
 * Unknown: For unclassified errors
 * External: For wrapping external errors (such as those from other systems or libraries)
 
@@ -68,23 +74,40 @@ Each error contains an ErrorContext with the following fields:
 > ```
 >
 > **Usage with a `Result`**:
-> 
 > ```rust
 > use ephais_error::{Error, Result};
+> use reqwest::Client;
 > 
-> fn risky_operation() -> Result<String> {
->     // Simulates a risky operation that can fail
->     let delay = 5000; // milliseconds
->     Err(Error::network(
->         "NET-TIMEOUT",
->         format!("Network error after timeout",
->         Some(std::collections::HashMap::from([
->             ("timeout_ms".to_string(), delay.to_string())
->         ])))
->     ))
+> async fn fetch_user_data(user_id: &str) -> Result<String> {
+>     if user_id.is_empty() {
+>         return Err(Error::network(
+>             "NET-INVALID",
+>             "User ID cannot be empty",
+>             None
+>         ));
+>     }
+>     
+>     let client = Client::new();
+>     match client
+>         .get(&format!("https://api.example.com/users/{}", user_id))
+>         .timeout(std::time::Duration::from_secs(5))
+>         .send()
+>         .await
+>     {
+>         Ok(response) => Ok(response.text().await.unwrap_or_default()),
+>         Err(e) => Err(Error::network(
+>             "NET-TIMEOUT",
+>             "Failed to fetch user data",
+>             Some(std::collections::HashMap::from([
+>                 ("user_id".to_string(), user_id.to_string()),
+>                 ("error".to_string(), e.to_string())
+>             ]))
+>         ))
+>     }
 > }
 > 
-> fn main() {
+> #[tokio::main]
+> async fn main() {
 >     match risky_operation() {
 >         Ok(value) => println!("Operation succeeded: {}", value),
 >         Err(err) => eprintln!("Operation failed: {}", err),
