@@ -62,7 +62,10 @@ pub enum Error {
     Unknown(ErrorContext),
 
     #[error("[FILE SYSTEM] {0}")]
-    FileSystem(ErrorContext),
+    FileSystem(
+        ErrorContext,
+        #[source] Box<dyn std::error::Error + Send + Sync>,
+    ),
 
     #[error("[EXTERNAL] {0} | Source: {1}")]
     External(
@@ -102,12 +105,20 @@ impl Error {
     }
 
     /// Creates a File System error
-    pub fn file_system(reference: &str, description: impl Into<String>) -> Self {
-        Self::FileSystem(ErrorContext::new(
-            &format!("FSY-{}", reference),
-            Severity::Error,
-            description,
-        ))
+    pub fn file_system(
+        reference: &str,
+        description: impl Into<String>,
+        source: Box<dyn std::error::Error + Send + Sync>,
+    ) -> Self {
+        Self::FileSystem(
+            ErrorContext {
+                reference: format!("FSY-{}", reference),
+                severity: Severity::Error,
+                description: description.into(),
+                metadata: HashMap::new(),
+            },
+            source,
+        )
     }
 
     /// Creates a new External error.
