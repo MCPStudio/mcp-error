@@ -7,4 +7,3 @@ description = "Error management library for all the Ephais rust project"
 license = "For the exclusive use of Ephais. Reserved Rights."
 
 [dependencies]
-thiserror = "2"

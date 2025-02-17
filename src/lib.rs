@@ -3,8 +3,8 @@
 //! Central error handling crate for Ephais ecosystem projects and libraries.
 
 use std::collections::HashMap;
+use std::error::Error as StdError;
 use std::fmt;
-use thiserror::Error;
 
 /// Error severity classification.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -15,8 +15,8 @@ pub enum Severity {
     Info,
 }
 
-impl std::fmt::Display for Severity {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+impl fmt::Display for Severity {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Severity::Critical => write!(f, "CRIT"),
             Severity::Error => write!(f, "ERR"),
@@ -50,28 +50,41 @@ impl fmt::Display for ErrorContext {
 }
 
 /// Core error type for the ecosystem.
-#[derive(Debug, Error)]
+#[derive(Debug)]
 pub enum Error {
-    #[error("[NETWORK] {0}")]
     Network(ErrorContext),
-
-    #[error("[DATA FORMAT] {0}")]
     DataFormat(ErrorContext),
-
-    #[error("[UNKNOWN] {0}")]
     Unknown(ErrorContext),
+    FileSystem(ErrorContext, Box<dyn StdError + Send + Sync>),
+    External(ErrorContext, Box<dyn StdError + Send + Sync>),
+}
 
-    #[error("[FILE SYSTEM] {0}")]
-    FileSystem(
-        ErrorContext,
-        #[source] Box<dyn std::error::Error + Send + Sync>,
-    ),
+/// Implement Display manually, rather than using `thiserror`.
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Error::Network(ctx) => write!(f, "[NETWORK] {}", ctx),
+            Error::DataFormat(ctx) => write!(f, "[DATA FORMAT] {}", ctx),
+            Error::Unknown(ctx) => write!(f, "[UNKNOWN] {}", ctx),
+            Error::FileSystem(ctx, source) => {
+                write!(f, "[FILE SYSTEM] {} | Source: {}", ctx, source)
+            }
+            Error::External(ctx, source) => {
+                write!(f, "[EXTERNAL] {} | Source: {}", ctx, source)
+            }
+        }
+    }
+}
 
-    #[error("[EXTERNAL] {0} | Source: {1}")]
-    External(
-        ErrorContext,
-        #[source] Box<dyn std::error::Error + Send + Sync>,
-    ),
+impl StdError for Error {
+    fn source(&self) -> Option<&(dyn StdError + 'static)> {
+        // If you have variants that wrap other errors, return Some(...) here
+        match self {
+            Error::FileSystem(_, src) => Some(&**src),
+            Error::External(_, src) => Some(&**src),
+            _ => None,
+        }
+    }
 }
 
 impl ErrorContext {
@@ -108,7 +121,7 @@ impl Error {
     pub fn file_system(
         reference: &str,
         description: impl Into<String>,
-        source: Box<dyn std::error::Error + Send + Sync>,
+        source: Box<dyn StdError + Send + Sync>,
     ) -> Self {
         Self::FileSystem(
             ErrorContext {
@@ -125,7 +138,7 @@ impl Error {
     pub fn external(
         reference: &str,
         description: impl Into<String>,
-        source: Box<dyn std::error::Error + Send + Sync>,
+        source: Box<dyn StdError + Send + Sync>,
     ) -> Self {
         Self::External(
             ErrorContext {
@@ -145,6 +158,7 @@ pub type Result<T> = std::result::Result<T, Error>;
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::io;
 
     #[test]
     fn network_error_display() {
@@ -157,7 +171,7 @@ mod tests {
 
     #[test]
     fn external_error_conversion() {
-        let io_err = std::io::Error::new(std::io::ErrorKind::NotFound, "File not found");
+        let io_err = io::Error::new(io::ErrorKind::NotFound, "File not found");
         let err = Error::external("FS-404", "Storage operation failed", Box::new(io_err));
         let output = format!("{}", err);
         println!("{:?}", output);
