@@ -48,7 +48,7 @@ Most Rust libraries define their own error type, but in a large organization or 
 
 ```toml
 [dependencies]
-ephais-error = { git = "ssh://git@github.com/ephais/ephais-error.git", tag = "v0.1.0" }
+ephais-error = { git = "ssh://git@github.com/ephais/ephais-error.git", tag = "v0.1.1" }
 ```
 
 (or point to your preferred branch, commit, or local path)
