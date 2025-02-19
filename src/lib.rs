@@ -62,6 +62,8 @@ pub enum Error {
     FileSystem(ErrorContext, Box<dyn StdError + Send + Sync>),
     /// External errors, always wrapping a source error
     External(ErrorContext, Box<dyn StdError + Send + Sync>),
+    /// SCP-related errors (optionally wrapping a source error)
+    Scp(ErrorContext, Option<Box<dyn StdError + Send + Sync>>),
 }
 
 /// Implement Display manually, rather than using `thiserror`.
@@ -92,6 +94,12 @@ impl fmt::Display for Error {
             Error::External(ctx, src) => {
                 write!(f, "[EXTERNAL] {} | Source: {}", ctx, src)
             }
+            Error::Scp(ctx, Some(src)) => {
+                write!(f, "[SCP] {} | Source: {}", ctx, src)
+            }
+            Error::Scp(ctx, None) => {
+                write!(f, "[SCP] {}", ctx)
+            }
         }
     }
 }
@@ -102,13 +110,17 @@ impl StdError for Error {
             // If we have an optional Box, return Some if present
             Error::Network(_, Some(src))
             | Error::DataFormat(_, Some(src))
-            | Error::Unknown(_, Some(src)) => Some(&**src),
+            | Error::Unknown(_, Some(src))
+            | Error::Scp(_, Some(src)) => Some(&**src),
 
             // Always a source here
             Error::FileSystem(_, src) | Error::External(_, src) => Some(&**src),
 
             // No source was set
-            Error::Network(_, None) | Error::DataFormat(_, None) | Error::Unknown(_, None) => None,
+            Error::Network(_, None)
+            | Error::DataFormat(_, None)
+            | Error::Unknown(_, None)
+            | Error::Scp(_, None) => None,
         }
     }
 }
@@ -200,6 +212,26 @@ impl Error {
                 metadata: HashMap::new(),
             },
             source,
+        )
+    }
+
+    /// Creates a new SCP error (no source)
+    pub fn scp(reference: &str, description: impl Into<String>) -> Self {
+        Self::Scp(
+            ErrorContext::new(&format!("SCP-{}", reference), Severity::Error, description),
+            None,
+        )
+    }
+
+    /// Creates a new SCP error (with a source)
+    pub fn scp_with_source(
+        reference: &str,
+        description: impl Into<String>,
+        source: Box<dyn StdError + Send + Sync>,
+    ) -> Self {
+        Self::Scp(
+            ErrorContext::new(&format!("SCP-{}", reference), Severity::Error, description),
+            Some(source),
         )
     }
 
