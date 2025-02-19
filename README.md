@@ -4,7 +4,7 @@ A minimal shared error-handling crate for the Ephais ecosystem.
 
 ## Overview
 
-This crate exposes a single `EphaisError` struct—plus a `Severity` enum—to unify how errors are represented across multiple Rust projects in the Ephais ecosystem. You can specify:
+This crate exposes a single `Error` struct—plus a `Severity` enum—to unify how errors are represented across multiple Rust projects in the Ephais ecosystem. You can specify:
 
 - **Severity** (`Critical`, `Error`, `Warning`, `Info`)
 - **Reference code** (e.g., "NET-001", "FSY-404")
@@ -30,41 +30,41 @@ ephais-error = { git = "ssh://git@github.com/ephais/ephais-error.git", tag = "v0
 ### 2. Creating a basic error
 
 ```rust
-use ephais_error::{EphaisError, Severity};
+use ephais_error::{Error, Severity};
 
 fn my_func() -> ephais_error::Result<()> {
     // Creating a basic error without a source
-    let err = EphaisError::new(Severity::Error, "NET-001", "Connection timed out");
+    let err = Error::new(Severity::Error, "NET-001", "Connection timed out");
     Err(err)
 }
 ```
 
 ### 3. Adding a source error
 
-If you have an `std::io::Error` or another error that implements `std::error::Error`, attach it to `EphaisError`:
+If you have an `std::io::Error` or another error that implements `std::error::Error`, attach it to `Error`:
 
 ```rust
-use ephais_error::{EphaisError, Severity};
+use ephais_error::{Error, Severity, Result};
 use std::io;
 
-fn read_file() -> ephais_error::Result<String> {
+fn read_file() -> Result<String> {
     let content = std::fs::read_to_string("myfile.txt")
         .map_err(|io_err| {
-            EphaisError::new(Severity::Error, "FSY-404", "Cannot read file")
+            Error::new(Severity::Error, "FSY-404", "Cannot read file")
                 .with_source(Box::new(io_err))
         })?;
     Ok(content)
 }
 ```
 
-When you print or log `EphaisError`, you’ll see both the main description **and** the source error message.
+When you print or log `Error`, you’ll see both the main description **and** the source error message.
 
 ### 4. Metadata
 
 Store additional context in the `metadata` field:
 
 ```rust
-let mut err = EphaisError::new(Severity::Warning, "PARSE-100", "Invalid format");
+let mut err = Error::new(Severity::Warning, "PARSE-100", "Invalid format");
 err = err.insert_metadata("filename", "data.json");
 err = err.insert_metadata("line", "42");
 

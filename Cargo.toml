@@ -1,6 +1,6 @@
 [package]
 name = "ephais-error"
-version = "0.1.3"
+version = "0.2.0"
 authors = ["vincent@ephais.eu"]
 edition = "2021"
 description = "Error management library for all the Ephais rust project"

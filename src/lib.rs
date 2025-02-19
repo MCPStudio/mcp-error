@@ -3,9 +3,9 @@
 //! A minimal shared error-handling crate for the Ephais ecosystem.
 //!
 //! ## Overview
-//! - A single `EphaisError` struct with optional source error
+//! - A single `Error` struct with optional source error
 //! - A `Severity` enum for classification
-//! - `Result<T> = std::result::Result<T, EphaisError>`
+//! - `Result<T> = std::result::Result<T, Error>`
 //! - Crates can attach specific references (like \"NET-001\", \"FSY-404\"), set severity, add metadata, etc.
 
 use std::collections::HashMap;
@@ -34,7 +34,7 @@ impl fmt::Display for Severity {
 
 /// A minimal, flexible error type for the Ephais ecosystem.
 #[derive(Debug)]
-pub struct EphaisError {
+pub struct Error {
     /// Severity of the error (Error, Warning, Info, etc.).
     pub severity: Severity,
     /// Short code or reference, e.g. \"NET-001\" or \"FSY-404\".
@@ -47,8 +47,8 @@ pub struct EphaisError {
     source: Option<Box<dyn StdError + Send + Sync>>,
 }
 
-impl EphaisError {
-    /// Creates a new `EphaisError` without a source.
+impl Error {
+    /// Creates a new `Error` without a source.
     pub fn new<S1, S2>(severity: Severity, reference: S1, description: S2) -> Self
     where
         S1: Into<String>,
@@ -63,7 +63,7 @@ impl EphaisError {
         }
     }
 
-    /// Adds or replaces the source error in an existing `EphaisError`.
+    /// Adds or replaces the source error in an existing `Error`.
     pub fn with_source(mut self, source: Box<dyn StdError + Send + Sync>) -> Self {
         self.source = Some(source);
         self
@@ -81,7 +81,7 @@ impl EphaisError {
     }
 }
 
-impl fmt::Display for EphaisError {
+impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         // Example output:
         // [ERR] Ref: NET-001 | description
@@ -105,7 +105,7 @@ impl fmt::Display for EphaisError {
     }
 }
 
-impl StdError for EphaisError {
+impl StdError for Error {
     fn source(&self) -> Option<&(dyn StdError + 'static)> {
         self.source
             .as_deref()
@@ -113,8 +113,8 @@ impl StdError for EphaisError {
     }
 }
 
-/// A convenient type alias for results that return `EphaisError`.
-pub type Result<T> = std::result::Result<T, EphaisError>;
+/// A convenient type alias for results that return `Error`.
+pub type Result<T> = std::result::Result<T, Error>;
 
 #[cfg(test)]
 mod tests {
@@ -123,7 +123,7 @@ mod tests {
 
     #[test]
     fn create_basic_error() {
-        let err = EphaisError::new(Severity::Error, "NET-001", "Timeout");
+        let err = Error::new(Severity::Error, "NET-001", "Timeout");
         assert_eq!(err.severity, Severity::Error);
         assert_eq!(err.reference, "NET-001");
         assert_eq!(err.description, "Timeout");
@@ -133,7 +133,7 @@ mod tests {
     #[test]
     fn attach_source_error() {
         let io_err = io::Error::new(io::ErrorKind::NotFound, "File not found");
-        let ephais_err = EphaisError::new(Severity::Error, "FSY-404", "Cannot read file")
+        let ephais_err = Error::new(Severity::Error, "FSY-404", "Cannot read file")
             .with_source(Box::new(io_err));
 
         // The Display should include the source:
@@ -146,7 +146,7 @@ mod tests {
 
     #[test]
     fn insert_metadata() {
-        let mut err = EphaisError::new(Severity::Warning, "DS-002", "Data parse incomplete");
+        let mut err = Error::new(Severity::Warning, "DS-002", "Data parse incomplete");
         err = err.insert_metadata("filename", "data.json");
         err = err.insert_metadata("line", "42");
 
