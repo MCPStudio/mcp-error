@@ -1,0 +1,13 @@
+[codes.FSY]
+"1" = "Can't open file"
+"2" = "Can't flush file"
+"3" = "Can't write file"
+"4" = "Can't read file"
+"5" = "Can't list directory"
+"6" = "Can't read the directory entry"
+"7" = "Can't create directory."
+"8" = "Can't delete file."
+"9" = "Can't delete directory."
+
+[codes.SSH]
+"1" = "Bad credentials"
