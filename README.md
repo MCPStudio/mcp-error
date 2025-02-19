@@ -1,118 +1,89 @@
 # ephais-error
 
-A **centralized error-handling crate** for the Ephais ecosystem, updated with the latest improvements from lib.rs. It provides:
+A minimal shared error-handling crate for the Ephais ecosystem.
 
-- **Enhanced error context** (including optional call stacks and extended metadata)
-- **Simplified creation** of domain-specific error variants with new helper methods
-- **Uniform error formatting** with advanced source tracking
+## Overview
 
-## Why this crate exists
+This crate exposes a single `EphaisError` struct—plus a `Severity` enum—to unify how errors are represented across multiple Rust projects in the Ephais ecosystem. You can specify:
 
-In modern Rust projects, consistent error handling is crucial. In large ecosystems you need to:
-1. **Standardize error representation** to ensure uniform logs and reports.
-2. Attain **richer metadata support** (including references, severity, and optional call stacks) for improved diagnostics.
-3. Facilitate **error composition** by wrapping underlying errors with enhanced context.
+- **Severity** (`Critical`, `Error`, `Warning`, `Info`)
+- **Reference code** (e.g., "NET-001", "FSY-404")
+- **Human-readable message**
+- **Optional metadata** for extended context
+- **Optional underlying error source** to chain other errors
 
-`ephais-error` centralizes these concerns and improves over previous iterations by:
-- Adding richer context details
-- Introducing new variants and helper constructors in lib.rs
-- Enhancing integration with custom logging and monitoring systems
-
-## How the crate works
-
-1. **ErrorContext** – now enriched with optional call stack captures and improved metadata:
-    - `reference`: A unique error code or name (e.g., `NET-TIMEOUT`)
-    - `severity`: The error’s notification level (`CRIT`, `ERR`, `WARN`, `INFO`)
-    - `description`: A human-readable explanation (e.g., "Failed to connect to server")
-    - `metadata`: Extended key-value context stored in a `HashMap<String, String>`
-    - (Optional) `call_stack`: Provides a debug stack trace when enabled
-
-2. **Severity** – an updated enum representing error levels, designed for future extension and custom thresholds.
-
-3. **Error** – a consolidated error enum with improved diagnostics and chaining:
-    - `Network(ErrorContext)`
-    - `DataFormat(ErrorContext)`
-    - `Unknown(ErrorContext)`
-    - `FileSystem(ErrorContext, Box<dyn std::error::Error + Send + Sync>)`
-    - `External(ErrorContext, Box<dyn std::error::Error + Send + Sync>)`
-    - (New) `Auth(ErrorContext)` for authentication-related errors
-
-Variants like FileSystem and External allow embedding source errors for full traceability. We continue to manually implement `Display` and `Error` (avoiding `thiserror`) for complete control and minimal dependencies.
+By keeping it simple, you avoid clutter and frequent version bumps in a large shared error type.
 
 ## Usage
 
-### 1. Update your Cargo.toml
+### 1. Add as a dependency
+
+In your `Cargo.toml`:
 
 ```toml
 [dependencies]
-ephais-error = { git = "ssh://git@github.com/ephais/ephais-error.git", tag = "v0.2.0" }
+ephais-error = { git = "ssh://git@github.com/ephais/ephais-error.git", tag = "v0.1.0" }
 ```
 
-### 2. Use `Error` or `Result` in your code
+(Or reference your local path / desired branch.)
+
+### 2. Creating a basic error
 
 ```rust
-use ephais_error::{Error, Result};
+use ephais_error::{EphaisError, Severity};
 
-fn do_something() -> Result<()> {
-     // Creating a network error with extended context
-     Err(Error::network("TIMEOUT", "Connection timed out"))
+fn my_func() -> ephais_error::Result<()> {
+    // Creating a basic error without a source
+    let err = EphaisError::new(Severity::Error, "NET-001", "Connection timed out");
+    Err(err)
 }
 ```
 
-For errors with an underlying cause:
+### 3. Adding a source error
+
+If you have an `std::io::Error` or another error that implements `std::error::Error`, attach it to `EphaisError`:
 
 ```rust
-use ephais_error::{Error, Result};
+use ephais_error::{EphaisError, Severity};
+use std::io;
 
-fn read_file() -> Result<String> {
-     let content = std::fs::read_to_string("somefile.txt")
-          .map_err(|io_err| Error::file_system("READFAIL", "Could not read file", Box::new(io_err)))?;
-     Ok(content)
+fn read_file() -> ephais_error::Result<String> {
+    let content = std::fs::read_to_string("myfile.txt")
+        .map_err(|io_err| {
+            EphaisError::new(Severity::Error, "FSY-404", "Cannot read file")
+                .with_source(Box::new(io_err))
+        })?;
+    Ok(content)
 }
 ```
 
-For authentication failures:
+When you print or log `EphaisError`, you’ll see both the main description **and** the source error message.
+
+### 4. Metadata
+
+Store additional context in the `metadata` field:
 
 ```rust
-use ephais_error::{Error, Result};
+let mut err = EphaisError::new(Severity::Warning, "PARSE-100", "Invalid format");
+err = err.insert_metadata("filename", "data.json");
+err = err.insert_metadata("line", "42");
 
-fn authenticate_user() -> Result<()> {
-     // Demonstrating the use of the new Auth error variant
-     Err(Error::auth("LOGIN_FAIL", "User authentication failed"))
-}
+println!("{}", err);
+// [WARN] Ref: PARSE-100 | Invalid format
+// (the metadata isn't shown by default, but can be useful for debugging or logging)
 ```
 
-## Error Handling and Logging
+## Why Use ephais-error?
 
-Errors format uniformly. For instance:
+- **Simplicity**: One flexible error type means fewer crates or enum variants to maintain.
+- **Consistency**: All errors share the same fields for severity, reference codes, and messages.
+- **Extensibility**: Crates can add domain-specific references, attach any error source, or store arbitrary metadata—without needing to change this crate.
 
-```
-[NETWORK] ERR | Ref: NET-TIMEOUT | Connection timed out
-```
+## Contributing
 
-When logging errors, inspect the underlying cause with the `source()` method:
-
-```rust
-fn handle_error(err: ephais_error::Error) {
-     println!("Encountered error: {}", err);
-     if let Some(src) = err.source() {
-          println!("Caused by: {}", src);
-     }
-}
-```
-
-## Extending or Customizing
-
-- Extend the `Error` enum to add new variants (e.g., business logic errors).
-- Customize error context by enhancing `ErrorContext` or integrating structured logging.
-- Use new helper methods in lib.rs for streamlined error creation and composition.
-
-## When to use this crate
-
-- When your projects need a unified error format across multiple components.
-- For consistent error logging and centralized diagnostics in the Ephais ecosystem.
-- When detailed error context, including metadata and optional call stacks, is required.
+Feel free to open pull requests or issues in the Ephais organization repository. The goal is to keep `ephais-error` small, so carefully consider if your feature truly needs to live here instead of your own crate.
 
 ## License
 
-This crate is proprietary to the Ephais ecosystem.
+This crate is proprietary to the Ephais ecosystem (or add your preferred license statement here).
+
