@@ -14,7 +14,49 @@ This crate exposes a single `Error` struct—plus a `Severity` enum—to unify h
 
 By keeping it simple, you avoid clutter and frequent version bumps in a large shared error type.
 
-## Usage
+## Map Ephais Err
+
+### Why
+. Mapping errors manually with map_err can lead to repetitive code and potential inconsistencies throughout your projects. By providing an extension trait, you standardize error conversion across your ecosystem, making your code cleaner and error messages uniform.
+
+### What
+The EphErrorExt trait adds a method (map_ephais_err) to Result<T, E>. This method converts any error implementing std::error::Error into your defined Error type. In doing so, it attaches:
+
+A defined severity (Severity)
+An error reference code (e.g., "FSY-404")
+A detailed human-readable description that includes the original error message
+The underlying error itself (as a source)
+
+### How
+Import the Trait:
+
+```rust
+use ephais_error::{Severity, Result};
+use ephais_error::EphErrorExt;
+```
+
+In your consumer crates, import the trait along with the required types:
+
+Convert Errors Using the Method:
+
+```rust
+use std::fs::File;
+
+let file = File::open("path/to/file")
+    .map_ephais_err(Severity::Error, "FSY-1", "Can't open file")?;
+```
+
+Instead of applying map_err manually, call map_ephais_err when handling results:
+
+Benefits:
+
+* Cleaner Code: Reduce boilerplate by encapsulating error conversion into a single method.
+* Consistency: Ensures all parts of your project use a unified approach for error handling.
+* Enhanced Debugging: Automatically chains the source error, preserving the original error context for easier troubleshooting.
+
+By adopting this approach, you'll maintain a concise and consistent error handling pattern across your applications.
+
+## Old Usage
 
 ### 1. Add as a dependency
 

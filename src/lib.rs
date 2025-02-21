@@ -116,6 +116,38 @@ impl StdError for Error {
 /// A convenient type alias for results that return `Error`.
 pub type Result<T> = std::result::Result<T, Error>;
 
+pub trait EphErrorExt<T> {
+    /// Convertit une erreur en `Error` en y ajoutant la source.
+    fn map_ephais_err(
+        self,
+        severity: Severity,
+        reference: impl Into<String>,
+        description: impl Into<String>,
+    ) -> Result<T>;
+}
+
+impl<T, E> EphErrorExt<T> for std::result::Result<T, E>
+where
+    E: StdError + Send + Sync + 'static,
+{
+    fn map_ephais_err(
+        self,
+        severity: Severity,
+        reference: impl Into<String>,
+        description: impl Into<String>,
+    ) -> Result<T> {
+        self.map_err(|e| {
+            Error::new(
+                severity,
+                reference,
+                // tu peux ici formater le `description` comme tu le souhaites
+                format!("{}: {}", description.into(), e),
+            )
+            .with_source(Box::new(e))
+        })
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
