@@ -14,47 +14,85 @@ This crate exposes a single `Error` struct—plus a `Severity` enum—to unify h
 
 By keeping it simple, you avoid clutter and frequent version bumps in a large shared error type.
 
-## Map Ephais Err
+## Mapping Errors with Ephais Methods
+
+Rather than mapping errors manually with `map_err`, the crate provides an extension trait with three methods to cover different use cases:
+
+- **`.map_ephais_inf`**: Converts the error into an `Error` with Severity set to `Info` and returns a `Result<T>`.
+- **`.map_ephais_err`**: For non-recoverable errors. On failure, it prints the error (with Severity set to `Error`) and exits the process with exit code `-1`.
+- **`.map_ephais_crit`**: Similar to the previous method but uses a `Critical` severity.
 
 ### Why
-. Mapping errors manually with map_err can lead to repetitive code and potential inconsistencies throughout your projects. By providing an extension trait, you standardize error conversion across your ecosystem, making your code cleaner and error messages uniform.
+
+Mapping errors manually with `map_err` can lead to repetitive code and potential inconsistencies throughout your projects. By providing these extension methods, you standardize error conversion across your ecosystem:
+- **Cleaner Code**: Encapsulate error conversion in a single method.
+- **Consistency**: Uniform error messages across your projects.
+- **Immediate Failure**: For non-recoverable errors, the process immediately exits after printing a clear, formatted error message.
 
 ### What
-The EphErrorExt trait adds a method (map_ephais_err) to Result<T, E>. This method converts any error implementing std::error::Error into your defined Error type. In doing so, it attaches:
 
-A defined severity (Severity)
-An error reference code (e.g., "FSY-404")
-A detailed human-readable description that includes the original error message
-The underlying error itself (as a source)
+The `EphErrorExt` trait adds these three methods to `Result<T, E>`:
+- `.map_ephais_inf(reference, description) -> Result<T>`
+- `.map_ephais_err(reference, description) -> T`
+- `.map_ephais_crit(reference, description) -> T`
+
+Each method converts any error implementing `std::error::Error` into your defined `Error` type. The conversion attaches:
+- A severity level (set automatically according to the method)
+- An error reference code (e.g., "FSY-404")
+- A detailed human-readable description that includes the original error message
+- The underlying error as the source
+
+For `.map_ephais_err` and `.map_ephais_crit`, if an error occurs the error is printed via `eprintln!` and the program exits with code `-1`.
 
 ### How
-Import the Trait:
 
-```rust
-use ephais_error::{Severity, Result};
-use ephais_error::EphErrorExt;
-```
+1. **Import the Trait**
 
-In your consumer crates, import the trait along with the required types:
+   In your consumer crates, import the trait along with the required types:
 
-Convert Errors Using the Method:
+   ```rust
+   use ephais_error::{Result};
+   use ephais_error::EphErrorExt;
+   ```
 
-```rust
-use std::fs::File;
+2. **Convert Errors Using the Methods**
 
-let file = File::open("path/to/file")
-    .map_ephais_err(Severity::Error, "FSY-1", "Can't open file")?;
-```
+   - **For Information-level errors (recoverable)**
 
-Instead of applying map_err manually, call map_ephais_err when handling results:
+     ```rust
+     use std::fs::File;
+     
+     // Continues execution by propagating a converted error
+     let file = File::open("path/to/file")
+         .map_ephais_inf("FSY-INFO", format!("Can't open file '{}'", "path/to/file"))?;
+     ```
+   
+   - **For Error-level failures (exit on error)**
 
-Benefits:
+     ```rust
+     use std::fs::File;
+     
+     // On failure, prints the error with Severity::Error and exits with code -1.
+     let file = File::open("path/to/file")
+         .map_ephais_err("FSY-ERR", format!("Can't open file '{}'", "path/to/file"));
+     ```
 
-* Cleaner Code: Reduce boilerplate by encapsulating error conversion into a single method.
-* Consistency: Ensures all parts of your project use a unified approach for error handling.
-* Enhanced Debugging: Automatically chains the source error, preserving the original error context for easier troubleshooting.
+   - **For Critical-level failures (exit on error)**
 
-By adopting this approach, you'll maintain a concise and consistent error handling pattern across your applications.
+     ```rust
+     use std::fs::File;
+     
+     // On failure, prints the error with Severity::Critical and exits with code -1.
+     let file = File::open("path/to/file")
+         .map_ephais_crit("FSY-CRIT", format!("Can't open file '{}'", "path/to/file"));
+     ```
+
+3. **Benefits**
+
+   - **Cleaner Code**: Reduce boilerplate by encapsulating error conversion into these methods.
+   - **Consistency**: All parts of your project use a unified approach for error handling.
+   - **Enhanced Debugging**: Automatically chains the source error, preserving the original error context.
+   - **Immediate Failure for Non-recoverable Errors**: With `.map_ephais_err` and `.map_ephais_crit`, the process terminates as soon as an error is encountered.
 
 ## Old Usage
 
@@ -64,7 +102,7 @@ In your `Cargo.toml`:
 
 ```toml
 [dependencies]
-ephais-error = { git = "ssh://git@github.com/ephais/ephais-error.git", tag = "v0.1.0" }
+ephais-error = { git = "ssh://git@github.com/ephais/ephais-error.git", tag = "v0.2.1" }
 ```
 
 (Or reference your local path / desired branch.)

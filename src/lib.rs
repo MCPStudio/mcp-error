@@ -117,34 +117,69 @@ impl StdError for Error {
 pub type Result<T> = std::result::Result<T, Error>;
 
 pub trait EphErrorExt<T> {
-    /// Convertit une erreur en `Error` en y ajoutant la source.
-    fn map_ephais_err(
+    /// For non-critical (Info) errors: converts the error into an `Error` with Severity::Info.
+    fn map_ephais_inf(
         self,
-        severity: Severity,
         reference: impl Into<String>,
         description: impl Into<String>,
     ) -> Result<T>;
+
+    /// For Error-level failures: print the error and exit the process.
+    fn map_ephais_err(self, reference: impl Into<String>, description: impl Into<String>) -> T;
+
+    /// For Critical-level failures: print the error and exit the process.
+    fn map_ephais_crit(self, reference: impl Into<String>, description: impl Into<String>) -> T;
 }
 
 impl<T, E> EphErrorExt<T> for std::result::Result<T, E>
 where
     E: StdError + Send + Sync + 'static,
 {
-    fn map_ephais_err(
+    fn map_ephais_inf(
         self,
-        severity: Severity,
         reference: impl Into<String>,
         description: impl Into<String>,
     ) -> Result<T> {
         self.map_err(|e| {
             Error::new(
-                severity,
+                Severity::Info,
                 reference,
-                // tu peux ici formater le `description` comme tu le souhaites
                 format!("{}: {}", description.into(), e),
             )
             .with_source(Box::new(e))
         })
+    }
+
+    fn map_ephais_err(self, reference: impl Into<String>, description: impl Into<String>) -> T {
+        match self {
+            Ok(value) => value,
+            Err(e) => {
+                let err = Error::new(
+                    Severity::Error,
+                    reference,
+                    format!("{}: {}", description.into(), e),
+                )
+                .with_source(Box::new(e));
+                eprintln!("{}", err);
+                std::process::exit(-1);
+            }
+        }
+    }
+
+    fn map_ephais_crit(self, reference: impl Into<String>, description: impl Into<String>) -> T {
+        match self {
+            Ok(value) => value,
+            Err(e) => {
+                let err = Error::new(
+                    Severity::Critical,
+                    reference,
+                    format!("{}: {}", description.into(), e),
+                )
+                .with_source(Box::new(e));
+                eprintln!("{}", err);
+                std::process::exit(-1);
+            }
+        }
     }
 }
 
