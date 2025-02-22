@@ -124,16 +124,24 @@ pub trait EphErrorExt<T> {
         description: impl Into<String>,
     ) -> Result<T>;
 
-    /// For Error-level failures: print the error and exit the process.
-    fn map_ephais_err(self, reference: impl Into<String>, description: impl Into<String>) -> T;
+    /// For Error-level failures: propagate the error.
+    fn map_ephais_err(
+        self,
+        reference: impl Into<String>,
+        description: impl Into<String>,
+    ) -> Result<T>;
 
-    /// For Critical-level failures: print the error and exit the process.
-    fn map_ephais_crit(self, reference: impl Into<String>, description: impl Into<String>) -> T;
+    /// For Critical-level failures: propagate the error.
+    fn map_ephais_crit(
+        self,
+        reference: impl Into<String>,
+        description: impl Into<String>,
+    ) -> Result<T>;
 }
 
 impl<T, E> EphErrorExt<T> for std::result::Result<T, E>
 where
-    E: StdError + Send + Sync + 'static,
+    E: std::error::Error + Send + Sync + 'static,
 {
     fn map_ephais_inf(
         self,
@@ -150,32 +158,49 @@ where
         })
     }
 
-    fn map_ephais_err(self, reference: impl Into<String>, description: impl Into<String>) -> T {
-        match self {
-            Ok(value) => value,
-            Err(e) => {
-                let err = Error::new(
-                    Severity::Error,
-                    reference,
-                    format!("{}: {}", description.into(), e),
-                )
-                .with_source(Box::new(e));
-                eprintln!("{}", err);
-                std::process::exit(-1);
-            }
-        }
+    fn map_ephais_err(
+        self,
+        reference: impl Into<String>,
+        description: impl Into<String>,
+    ) -> Result<T> {
+        self.map_err(|e| {
+            Error::new(
+                Severity::Error,
+                reference,
+                format!("{}: {}", description.into(), e),
+            )
+            .with_source(Box::new(e))
+        })
     }
 
-    fn map_ephais_crit(self, reference: impl Into<String>, description: impl Into<String>) -> T {
+    fn map_ephais_crit(
+        self,
+        reference: impl Into<String>,
+        description: impl Into<String>,
+    ) -> Result<T> {
+        self.map_err(|e| {
+            Error::new(
+                Severity::Critical,
+                reference,
+                format!("{}: {}", description.into(), e),
+            )
+            .with_source(Box::new(e))
+        })
+    }
+}
+
+pub trait OrExit<T> {
+    fn or_exit(self) -> T;
+}
+
+impl<T, E> OrExit<T> for std::result::Result<T, E>
+where
+    E: std::error::Error + Send + Sync + 'static,
+{
+    fn or_exit(self) -> T {
         match self {
             Ok(value) => value,
-            Err(e) => {
-                let err = Error::new(
-                    Severity::Critical,
-                    reference,
-                    format!("{}: {}", description.into(), e),
-                )
-                .with_source(Box::new(e));
+            Err(err) => {
                 eprintln!("{}", err);
                 std::process::exit(-1);
             }

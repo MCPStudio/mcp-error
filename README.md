@@ -19,43 +19,49 @@ By keeping it simple, you avoid clutter and frequent version bumps in a large sh
 Rather than mapping errors manually with `map_err`, the crate provides an extension trait with three methods to cover different use cases:
 
 - **`.map_ephais_inf`**: Converts the error into an `Error` with Severity set to `Info` and returns a `Result<T>`.
-- **`.map_ephais_err`**: For non-recoverable errors. On failure, it prints the error (with Severity set to `Error`) and exits the process with exit code `-1`.
-- **`.map_ephais_crit`**: Similar to the previous method but uses a `Critical` severity.
+- **`.map_ephais_err`**: Converts the error into an `Error` with Severity set to `Error` and returns a `Result<T>`.
+- **`.map_ephais_crit`**: Converts the error into an `Error` with Severity set to `Critical` and returns a `Result<T>`.
+
+For cases where an error is non-recoverable, you can chain the conversion with the `.or_exit()` method, which prints the error and exits the process with code `-1`.
 
 ### Why
 
 Mapping errors manually with `map_err` can lead to repetitive code and potential inconsistencies throughout your projects. By providing these extension methods, you standardize error conversion across your ecosystem:
 - **Cleaner Code**: Encapsulate error conversion in a single method.
 - **Consistency**: Uniform error messages across your projects.
-- **Immediate Failure**: For non-recoverable errors, the process immediately exits after printing a clear, formatted error message.
+- **Immediate Failure**: Non-recoverable errors can be immediately handled by chaining with `.or_exit()`, terminating the process with a clear, formatted error message.
 
 ### What
 
 The `EphErrorExt` trait adds these three methods to `Result<T, E>`:
 - `.map_ephais_inf(reference, description) -> Result<T>`
-- `.map_ephais_err(reference, description) -> T`
-- `.map_ephais_crit(reference, description) -> T`
+- `.map_ephais_err(reference, description) -> Result<T>`
+- `.map_ephais_crit(reference, description) -> Result<T>`
 
-Each method converts any error implementing `std::error::Error` into your defined `Error` type. The conversion attaches:
-- A severity level (set automatically according to the method)
-- An error reference code (e.g., "FSY-404")
-- A detailed human-readable description that includes the original error message
-- The underlying error as the source
+Additionally, the `OrExit` trait adds the `.or_exit()` method to `Result<T, E>`, allowing you to immediately exit the process in case of an error. In other words, for critical error scenarios you can write:
 
-For `.map_ephais_err` and `.map_ephais_crit`, if an error occurs the error is printed via `eprintln!` and the program exits with code `-1`.
+```rust
+use std::fs::File;
+use ephais_error::{Result, EphErrorExt, OrExit};
+
+// On failure, converts error with Severity::Error and exits if an error occurs.
+let file = File::open("path/to/file")
+    .map_ephais_err("FSY-ERR", format!("Can't open file '{}'", "path/to/file"))
+    .or_exit();
+```
 
 ### How
 
-1. **Import the Trait**
+1. **Import the Traits**
 
-   In your consumer crates, import the trait along with the required types:
+   In your consumer crates, import the traits along with the required types:
 
    ```rust
    use ephais_error::{Result};
-   use ephais_error::EphErrorExt;
+   use ephais_error::{EphErrorExt, OrExit};
    ```
 
-2. **Convert Errors Using the Methods**
+2. **Convert Errors and Exit When Needed**
 
    - **For Information-level errors (recoverable)**
 
@@ -66,15 +72,17 @@ For `.map_ephais_err` and `.map_ephais_crit`, if an error occurs the error is pr
      let file = File::open("path/to/file")
          .map_ephais_inf("FSY-INFO", format!("Can't open file '{}'", "path/to/file"))?;
      ```
-   
+     
    - **For Error-level failures (exit on error)**
 
      ```rust
      use std::fs::File;
      
-     // On failure, prints the error with Severity::Error and exits with code -1.
+     // On failure: converts the error with Severity::Error and, by chaining `.or_exit()`,
+     // it prints the error and exits with code -1.
      let file = File::open("path/to/file")
-         .map_ephais_err("FSY-ERR", format!("Can't open file '{}'", "path/to/file"));
+         .map_ephais_err("FSY-ERR", format!("Can't open file '{}'", "path/to/file"))
+         .or_exit();
      ```
 
    - **For Critical-level failures (exit on error)**
@@ -82,9 +90,10 @@ For `.map_ephais_err` and `.map_ephais_crit`, if an error occurs the error is pr
      ```rust
      use std::fs::File;
      
-     // On failure, prints the error with Severity::Critical and exits with code -1.
+     // On failure: converts the error with Severity::Critical and exits with code -1.
      let file = File::open("path/to/file")
-         .map_ephais_crit("FSY-CRIT", format!("Can't open file '{}'", "path/to/file"));
+         .map_ephais_crit("FSY-CRIT", format!("Can't open file '{}'", "path/to/file"))
+         .or_exit();
      ```
 
 3. **Benefits**
@@ -92,7 +101,7 @@ For `.map_ephais_err` and `.map_ephais_crit`, if an error occurs the error is pr
    - **Cleaner Code**: Reduce boilerplate by encapsulating error conversion into these methods.
    - **Consistency**: All parts of your project use a unified approach for error handling.
    - **Enhanced Debugging**: Automatically chains the source error, preserving the original error context.
-   - **Immediate Failure for Non-recoverable Errors**: With `.map_ephais_err` and `.map_ephais_crit`, the process terminates as soon as an error is encountered.
+   - **Immediate Failure for Non-recoverable Errors**: By chaining `.or_exit()`, the process terminates as soon as an error is encountered.
 
 ## Old Usage
 
@@ -161,9 +170,8 @@ println!("{}", err);
 
 ## Contributing
 
-Feel free to open pull requests or issues in the Ephais organization repository. The goal is to keep `ephais-error` small, so carefully consider if your feature truly needs to live here instead of your own crate.
+Feel free to open pull requests or issues in the Ephais organization repository. The goal is to keep ephais-error small, so carefully consider if your feature truly needs to live here instead of your own crate.
 
 ## License
 
 This crate is proprietary to the Ephais ecosystem (or add your preferred license statement here).
-
