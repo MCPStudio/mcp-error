@@ -1,6 +1,6 @@
 [package]
 name = "mcp-error"
-version = "0.3.1"
+version = "0.3.2"
 authors = ["vincent@ephais.eu"]
 edition = "2021"
 description = "Error management library for all the MCP Studio rust project"
