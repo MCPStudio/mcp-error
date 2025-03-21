@@ -12,8 +12,14 @@ use std::collections::HashMap;
 use std::error::Error as StdError;
 use std::fmt;
 
+use serde::{
+    ser::{SerializeStruct},
+    Serializer,
+};
+use serde_derive::Serialize;
+
 /// Indicates how severe an error is.
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, serde::Serialize)]
 pub enum Severity {
     Critical,
     Error,
@@ -32,8 +38,8 @@ impl fmt::Display for Severity {
     }
 }
 
-/// A minimal, flexible error type for the MCP Studio ecosystem.
-#[derive(Debug)]
+/// A minimal, flexible error type for the Ephais ecosystem.
+#[derive(Debug, Serialize)]
 pub struct Error {
     /// Severity of the error (Error, Warning, Info, etc.).
     pub severity: Severity,
@@ -44,7 +50,24 @@ pub struct Error {
     /// Optional metadata for additional context.
     pub metadata: HashMap<String, String>,
     /// Optional underlying source error.
+    #[serde(serialize_with = "serialize_source")]
     source: Option<Box<dyn StdError + Send + Sync>>,
+}
+
+fn serialize_source<S>(
+    source: &Option<Box<dyn StdError + Send + Sync>>,
+    serializer: S,
+) -> std::result::Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    if let Some(source) = source {
+        let mut state = serializer.serialize_struct("Source", 1)?;
+        state.serialize_field("message", &source.to_string())?;
+        state.end()
+    } else {
+        serializer.serialize_none()
+    }
 }
 
 impl Error {
@@ -211,6 +234,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_json;
     use std::io;
 
     #[test]
@@ -244,5 +268,24 @@ mod tests {
 
         assert_eq!(err.metadata["filename"], "data.json");
         assert_eq!(err.metadata["line"], "42");
+    }
+
+    #[test]
+    fn serialize_error() {
+        let err = Error::new(Severity::Error, "NET-001", "Timeout");
+        let serialized = serde_json::to_string(&err).unwrap();
+        let expected = r#"{"severity":"Error","reference":"NET-001","description":"Timeout","metadata":{},"source":null}"#;
+        assert_eq!(serialized, expected);
+    }
+
+    #[test]
+    fn serialize_error_with_source() {
+        let io_err = io::Error::new(io::ErrorKind::NotFound, "File not found");
+        let ephais_err = Error::new(Severity::Error, "FSY-404", "Cannot read file")
+            .with_source(Box::new(io_err));
+
+        let serialized = serde_json::to_string(&ephais_err).unwrap();
+        let expected = r#"{"severity":"Error","reference":"FSY-404","description":"Cannot read file","metadata":{},"source":{"message":"File not found"}}"#;
+        assert_eq!(serialized, expected);
     }
 }
