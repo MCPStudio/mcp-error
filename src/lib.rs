@@ -1,6 +1,6 @@
-//! # ephais-error
+//! # mcp-error
 //!
-//! A minimal shared error-handling crate for the Ephais ecosystem.
+//! A minimal shared error-handling crate for the MCP Studio ecosystem.
 //!
 //! ## Overview
 //! - A single `Error` struct with optional source error
@@ -32,7 +32,7 @@ impl fmt::Display for Severity {
     }
 }
 
-/// A minimal, flexible error type for the Ephais ecosystem.
+/// A minimal, flexible error type for the MCP Studio ecosystem.
 #[derive(Debug)]
 pub struct Error {
     /// Severity of the error (Error, Warning, Info, etc.).
@@ -118,21 +118,21 @@ pub type Result<T> = std::result::Result<T, Error>;
 
 pub trait EphErrorExt<T> {
     /// For non-critical (Info) errors: converts the error into an `Error` with Severity::Info.
-    fn map_ephais_inf(
+    fn map_mcp_inf(
         self,
         reference: impl Into<String>,
         description: impl Into<String>,
     ) -> Result<T>;
 
     /// For Error-level failures: propagate the error.
-    fn map_ephais_err(
+    fn map_mcp_err(
         self,
         reference: impl Into<String>,
         description: impl Into<String>,
     ) -> Result<T>;
 
     /// For Critical-level failures: propagate the error.
-    fn map_ephais_crit(
+    fn map_mcp_crit(
         self,
         reference: impl Into<String>,
         description: impl Into<String>,
@@ -143,7 +143,7 @@ impl<T, E> EphErrorExt<T> for std::result::Result<T, E>
 where
     E: std::error::Error + Send + Sync + 'static,
 {
-    fn map_ephais_inf(
+    fn map_mcp_inf(
         self,
         reference: impl Into<String>,
         description: impl Into<String>,
@@ -158,7 +158,7 @@ where
         })
     }
 
-    fn map_ephais_err(
+    fn map_mcp_err(
         self,
         reference: impl Into<String>,
         description: impl Into<String>,
@@ -173,7 +173,7 @@ where
         })
     }
 
-    fn map_ephais_crit(
+    fn map_mcp_crit(
         self,
         reference: impl Into<String>,
         description: impl Into<String>,
@@ -225,15 +225,15 @@ mod tests {
     #[test]
     fn attach_source_error() {
         let io_err = io::Error::new(io::ErrorKind::NotFound, "File not found");
-        let ephais_err = Error::new(Severity::Error, "FSY-404", "Cannot read file")
+        let mcp_err = Error::new(Severity::Error, "FSY-404", "Cannot read file")
             .with_source(Box::new(io_err));
 
         // The Display should include the source:
-        let out = format!("{}", ephais_err);
+        let out = format!("{}", mcp_err);
         assert!(out.contains("Source: File not found"));
 
         // The source() method should return Some
-        assert!(ephais_err.source().is_some());
+        assert!(mcp_err.source().is_some());
     }
 
     #[test]
